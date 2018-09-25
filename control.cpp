@@ -42,7 +42,7 @@ int main(int argc, char* argv)
     
     initUndistortRectifyMap(cameraMatrix, distCoeffs, Mat(), cameraMatrix, imageSize, CV_32FC1, map1, map2);
     Path_Finder* pf = new Path_Finder();
-    fp->init();
+    pf->init();
     FILE* fp = fopen("/home/nvidia/Desktop/p2", "w");
     fprintf(fp, "%d", 0);
     fclose(fp);
@@ -54,13 +54,13 @@ int main(int argc, char* argv)
 	    cali_img = origin_img.clone();
         remap(origin_img, cali_img, map1, map2, CV_INTER_LINEAR);
 	    pf->operate(cali_img);
-        for(int i = 0; i < pf->direction_vec.size(); i++){
-            steer = q.front();
-            q.pop();
+        int size = pf->direction_vec.size();
+        for(int i = 0; i < size; i++){
+            float steer = pf->direction_vec.front();
+            pf->direction_vec.pop();
             FILE* fp = fopen("/home/nvidia/Desktop/p2", "w");
             fprintf(fp, "%f", steer);
 	        fclose(fp);
-            printf("steer : %f\n", steer);
         }
 	    	
     }
