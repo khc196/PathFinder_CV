@@ -35,19 +35,42 @@ protected:
 	VideoWriter outputVideo;
 	bool isinit = true;
 	float steer;
+	
+	// for pid
+	const float KP = -0.007;
+	const float KI = -0.00001;
+	const float KD = -0.0001;
+	float position;
+	float error;
+	float prev_error;
+	float error_sum;
+	
+	float KP2 = 0.15f;
+	float KI2 = 0.001f;
+	float KD2 = 0.001f;
+	float error2;
+	float prev_error2;
+	float error_sum2;
+	int DI;
+	int GB;
+	int ST;
+
 	const int car_position_x = 100;
-	const int car_position_y = 160;
-	const int car_width = 70;
-	const int car_height = 40;
-	const int straight_unit = 10;
-	const int curve_unit = 5;
+	const int car_position_y = 130;
+	const int car_width = 4;
+	const int car_height = 4;
+	int straight_unit = 10;
+	int curve_unit = 4;
+	int prev_position_x = 100;;
 	int find_path(int x, int y, int count);
 	int find_init_position();
+	void generate_costmap(Mat src, Mat dst);
 public:
 	Path_Finder() {}
 	void init();
 	void operate(Mat originImg);
 	queue<float> direction_vec;
+	int speed;
 };
 
 void Path_Finder::init() {
@@ -62,11 +85,20 @@ void Path_Finder::init() {
 	vanishing_point_y = 235;
 	steer = 0.f;
 	//outputVideo.open(s_t, VideoWriter::fourcc('X', 'V', 'I', 'D'), 10, Size(720, 120), true);
-	outputVideo.open(s_t, VideoWriter::fourcc('D', 'I', 'V', 'X'), 10, Size(720, 120), true);
+	outputVideo.open(s_t, VideoWriter::fourcc('D', 'I', 'V', 'X'), 10, Size(920, 200), true);
 	ipm_table = new int[DST_REMAPPED_WIDTH * DST_REMAPPED_HEIGHT];
     build_ipm_table(SRC_RESIZED_WIDTH, SRC_RESIZED_HEIGHT, 
                     DST_REMAPPED_WIDTH, DST_REMAPPED_HEIGHT, 
                     vanishing_point_x, vanishing_point_y, ipm_table);
+	position = 0.f;
+	error = 0.f;
+	prev_error = 0.f;
+	error_sum = 0.f;
+	error2 = 0.f;
+	prev_error2 = 0.f;
+	error_sum2 = 0.f;
+
+	speed = 120;
 }
 void Path_Finder::operate(Mat originImg) {
 	Mat grayImg;
@@ -76,6 +108,20 @@ void Path_Finder::operate(Mat originImg) {
     inverse_perspective_mapping(DST_REMAPPED_WIDTH, DST_REMAPPED_HEIGHT, grayImg.data, ipm_table, remappedImg.data);
 	Canny(remappedImg, cannyImg, 70, 210);
 	morphologyEx(cannyImg, dilatedImg, MORPH_CLOSE, Mat(12,12, CV_8U, Scalar(1)));
+	Mat black(Size(200, 70), CV_8U, Scalar(0));
+	black.copyTo(dilatedImg(Rect(0, 130, 200, 70)));
+
+	ifstream pid_file("pid_K");
+	pid_file >> KP2 >> KI2 >> KD2 >> DI >> GB >> ST;
+
+	straight_unit = ST * 2;
+	curve_unit = straight_unit;
+	for(int i = 0; i < DI; i++){
+		dilate(dilatedImg, dilatedImg, Mat());
+	}
+	for(int i = 0; i < GB; i++) {
+		GaussianBlur(dilatedImg, dilatedImg, Size(9,9), 3);
+	}
 
 	/* control */
 	for(int i = 0; i < 200; i++){
@@ -84,7 +130,12 @@ void Path_Finder::operate(Mat originImg) {
 			ds_array[i][j] = -1;
 		}
 	}
-	int init_position_x = find_init_position();
+	// int init_position_x = find_init_position();
+	// if(abs(prev_position_x - init_position_x) > 30){
+	// 	init_position_x = prev_position_x;
+	// }
+	int init_position_x = 100;
+	prev_position_x = init_position_x;
 	find_path(init_position_x, car_position_y, 0);
 	
 	cvtColor(remappedImg, remappedImg, CV_GRAY2BGR);
@@ -95,7 +146,7 @@ void Path_Finder::operate(Mat originImg) {
 	vector<Point> way_points;
 
 	while(current_y > 30){
-		circle(dilatedImg, Point(current_x, current_y), 3, Scalar(0, 255, 0), -1);
+		//circle(dilatedImg, Point(current_x, current_y), 3, Scalar(0, 255, 0), -1);
 		way_points.push_back(Point(current_x, current_y));
 		if(ds_array[current_x][current_y] == -1){
 			break;
@@ -114,15 +165,37 @@ void Path_Finder::operate(Mat originImg) {
 			break;
 		}
 	}
+	prev_error = error;
+	position = (float)init_position_x;
+	error = 100.f - init_position_x;
+	error_sum += error;
+	prev_error2 = error2;
 	
+	float pid = error * KP + error_sum * KI + (error - prev_error) * KD;
+	steer = 0.f;
+	
+	printf("KP : %f, KI : %f, KD : %f\n", KP2, KI2, KD2);
+	KP2 /= 1000;
+	KI2 /= 1000;
+	KD2 /= 1000;
+	pid_file.close();
 	for(int i = 0; i < way_points.size() - 1; i++){
 		Point vec = Point(way_points[i+1].x - way_points[i].x, way_points[i+1].y - way_points[i].y); 
 		line(dilatedImg, Point(way_points[i+1].x, way_points[i+1].y), Point(way_points[i].x, way_points[i].y), Scalar(0,255,0), 1, CV_AA);
 		//rectangle(dilatedImg, Point(vec_cp[i].x - car_width/2, -vec_cp[i].y + car_height)
 		
-		steer = 0.f;
-		if(vec.x != 0)
-			steer = (atan(-vec.y / vec.x) * 180 / M_PI) / 90; 
+		if(vec.x != 0){
+			prev_error2 = error2;
+			error2 = (atan(-vec.y / vec.x) * 180 / M_PI) / 90;
+			error_sum2 += error2;
+			float pid2 = error2 * KP2 + error_sum2 * KI2 + (error2 - prev_error2) * KD2;
+			steer += pid2;
+		}
+		else{
+			error2 = 0;
+			prev_error2 = 0;
+			error_sum2 = 0;
+		}
 		printf("steer : %f\n", steer);
 		direction_vec.push(steer);
 	}
@@ -137,20 +210,22 @@ void Path_Finder::operate(Mat originImg) {
 	resize(dilatedImg, dilatedImg, Size(200, 200));
 	hconcat(result, dilatedImg, result);
 	imshow("result", result);
+	outputVideo << result;
 	if(waitKey(10) == 0) {
 		return;
 	}
 	return;
 }
+
 int Path_Finder::find_init_position(){
 	int min_cost = 1000;
-	int position_x;
+	int position_x = 100;
 	for(int i = car_position_x; i < 200; i++){
 		int count = 0;
 		for(int j = i - car_width/2; j <= i + car_width/2; j++){
 			for(int k = car_position_y; k >= car_position_y - car_height/2; k--){
 				if(j > 0 && dilatedImg.data[k * dilatedImg.step + j] > 0){
-					count++;
+					count += dilatedImg.data[k * dilatedImg.step + j];
 				}
 			}
 		}
@@ -164,7 +239,7 @@ int Path_Finder::find_init_position(){
 		for(int j = i - car_width/2; j <= i + car_width/2; j++){
 			for(int k = car_position_y; k >= car_position_y - car_height/2; k--){
 				if(j < 200 && dilatedImg.data[k * dilatedImg.step + j] > 0){
-					count++;
+					count += dilatedImg.data[k * dilatedImg.step + j];
 				}
 			}
 		}
@@ -183,21 +258,24 @@ int Path_Finder::find_path(int x, int y, int count){
 	for(int j = x - car_width/2; j <= x + car_width/2; j++){
 		for(int k = y; k >= y - car_height/2; k--){
 			if(j >= 0 && j < 200 &&dilatedImg.data[k * dilatedImg.step + j] > 0){
-				visit_array[x][y]++;
+				visit_array[x][y] += dilatedImg.data[k * dilatedImg.step + j];
 			}
 		}
 	}
-	if (y <= 30 || count > 10 || visit_array[x][y] > 200) {
+	if(visit_array[x][y] > 1500){
+		visit_array[x][y] *= 10;
+	}
+	if (y <= 60) {
 		return visit_array[x][y];
 	}
 	//printf("%d %d, %d\n", x, y, visit_array[x][y]);
 	int up_cost = 10000, left_cost = 10000, right_cost = 10000;
-	up_cost = find_path(x, y-straight_unit, count+1);
+	up_cost = visit_array[x][y] + find_path(x, y-straight_unit, count+1);
 	if(x-curve_unit >= 0){
-		left_cost = find_path(x-curve_unit, y-curve_unit, count+1);
+		left_cost = visit_array[x][y] + find_path(x-curve_unit, y-curve_unit, count+1);
 	}
 	if(x+curve_unit < 200){
-		right_cost = find_path(x+curve_unit, y-curve_unit, count+1);
+		right_cost = visit_array[x][y] + find_path(x+curve_unit, y-curve_unit, count+1);
 	}
 	int min_cost = up_cost;
 	ds_array[x][y] = 0;
@@ -209,7 +287,20 @@ int Path_Finder::find_path(int x, int y, int count){
 		min_cost = right_cost;
 		ds_array[x][y] = 2;
 	}
+	visit_array[x][y] = min_cost;
+	return min_cost;
+}
+void Path_Finder::generate_costmap(Mat src, Mat dst){
 	
-	return min_cost + visit_array[x][y];
+	Size s = src.size();
+	int width = s.width;
+	int height = s.height;
+
+	// for(int i = 0; i < width; i++){
+	// 	for(int j = 0; j < height; j++){
+	// 		if(src.data[j * src.step + i] != 0){
+	// 		}
+	// 	}
+	// }
 }
 #endif

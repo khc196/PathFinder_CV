@@ -22,7 +22,7 @@ int main(int argc, char* argv)
     key_t skey;
     void *shared_memory;
     skey = 5678;
-    shmid = shmget((key_t) skey, size_of_shared_memory + sizeof(int) * 2, 0777);
+    shmid = shmget((key_t) skey, size_of_shared_memory + sizeof(int) * 5, 0777);
     if (shmid == -1) {
 		perror("shmget failed :");
         exit(1);
@@ -35,10 +35,12 @@ int main(int argc, char* argv)
     Path_Finder* pf = new Path_Finder();
     pf->init();
     int* torcs_lock = (int*)(shared_memory + size_of_shared_memory + sizeof(int));
+    *torcs_lock = 1;
     while(true){
         if(*torcs_lock == 1) {
             unsigned char* img = (unsigned char*)shared_memory;
             float* torcs_steer = (float*)(shared_memory + size_of_shared_memory);
+            int* torcs_speed = (int*)(shared_memory + size_of_shared_memory + sizeof(int)*2);
             Mat origin_img(480, 640, CV_8UC3, img);
             memcpy(img, origin_img.data, sizeof(unsigned char) * 640 * 480 * 3);
             Mat flipped_img;
@@ -46,10 +48,12 @@ int main(int argc, char* argv)
             pf->operate(flipped_img);
             int size = pf->direction_vec.size();
             *torcs_steer = 0;
+            float speed = 83.f;
             for(int i = 0; i < size; i++){
-                *torcs_steer = -pf->direction_vec.front();
+                *torcs_steer = -pf->direction_vec.front() * (80 / speed);
                 pf->direction_vec.pop();
             }
+            *torcs_speed = speed * 1000 / 3600;
             *torcs_lock = 0;
         }
     }

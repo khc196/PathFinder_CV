@@ -17,7 +17,7 @@ const Size imageSize = Size(640, 480);
 int main(int argc, char* argv) 
 { 
     VideoCapture capture;
-    capture.open(-1);
+    capture.open(0);
     
     if (!capture.isOpened()){
         cerr << "Camera error" << endl;
