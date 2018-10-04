@@ -56,8 +56,8 @@ protected:
 	int ST;
 
 	const int car_position_x = 100;
-	const int car_position_y = 130;
-	const int car_width = 4;
+	const int car_position_y = 145;
+	const int car_width = 20;
 	const int car_height = 4;
 	int straight_unit = 10;
 	int curve_unit = 4;
@@ -181,7 +181,7 @@ void Path_Finder::operate(Mat originImg) {
 	pid_file.close();
 	for(int i = 0; i < way_points.size() - 1; i++){
 		Point vec = Point(way_points[i+1].x - way_points[i].x, way_points[i+1].y - way_points[i].y); 
-		line(dilatedImg, Point(way_points[i+1].x, way_points[i+1].y), Point(way_points[i].x, way_points[i].y), Scalar(0,255,0), 1, CV_AA);
+		//line(dilatedImg, Point(way_points[i+1].x, way_points[i+1].y), Point(way_points[i].x, way_points[i].y), Scalar(0,255,0), 1, CV_AA);
 		//rectangle(dilatedImg, Point(vec_cp[i].x - car_width/2, -vec_cp[i].y + car_height)
 		
 		if(vec.x != 0){
@@ -199,18 +199,42 @@ void Path_Finder::operate(Mat originImg) {
 		printf("steer : %f\n", steer);
 		direction_vec.push(steer);
 	}
+	speed = 83.f;
 	printf("---------------------------------\n");
 	/* just for imshow */
 	Mat result;
 	resize(originImg, originImg, Size(320, 200));
 	resize(remappedImg, remappedImg, Size(200, 200));
+
+	Mat rewarp = originImg.clone();
+	Point2f inputQuad[4]; 
+    Point2f outputQuad[4];
+	Mat mask;
+	inRange(dilatedImg, Scalar(10,10,10), Scalar(255,255,255), mask);
+	inputQuad[0] = Point2f( 0, 0);
+    inputQuad[1] = Point2f( 199, 0);
+    inputQuad[2] = Point2f( 199, 199);
+    inputQuad[3] = Point2f( 0, 199);  
+    // The 4 points where the mapping is to be done , from top-left in clockwise order
+    outputQuad[0] = Point2f( 100,115 );
+    outputQuad[1] = Point2f( 209,115);
+    outputQuad[2] = Point2f( 1200,360);
+    outputQuad[3] = Point2f( -850,360);
+	Mat lambda = getPerspectiveTransform( inputQuad, outputQuad );
+	
+	Mat red = dilatedImg.clone();
+	red.setTo(Scalar(0,100,255), mask);
+	warpPerspective(red, rewarp, lambda, Size(320, 200));
+	addWeighted(rewarp, 0.4, originImg, 1.0, 0.0, originImg);
+	
 	hconcat(originImg, remappedImg, result);
 	resize(cannyImg, cannyImg, Size(200, 200));
-	hconcat(result, cannyImg, result);
-	resize(dilatedImg, dilatedImg, Size(200, 200));
-	hconcat(result, dilatedImg, result);
+	//hconcat(result, cannyImg, result);
+	//resize(dilatedImg, dilatedImg, Size(200, 200));
+	//hconcat(result, dilatedImg, result);
+	
 	imshow("result", result);
-	outputVideo << result;
+	//outputVideo << result;
 	if(waitKey(10) == 0) {
 		return;
 	}

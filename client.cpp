@@ -42,15 +42,17 @@ int main(int argc, char* argv)
             float* torcs_steer = (float*)(shared_memory + size_of_shared_memory);
             int* torcs_speed = (int*)(shared_memory + size_of_shared_memory + sizeof(int)*2);
             Mat origin_img(480, 640, CV_8UC3, img);
-            memcpy(img, origin_img.data, sizeof(unsigned char) * 640 * 480 * 3);
+            memcpy(img, origin_img.data, size_of_shared_memory);
             Mat flipped_img;
             flip(origin_img, flipped_img, 0);
             pf->operate(flipped_img);
             int size = pf->direction_vec.size();
             *torcs_steer = 0;
-            float speed = 83.f;
+            //int speed = (int) pf->speed;
+            int speed = 83;
+            speed = pf->speed;
             for(int i = 0; i < size; i++){
-                *torcs_steer = -pf->direction_vec.front() * (80 / speed);
+                *torcs_steer = -pf->direction_vec.front();
                 pf->direction_vec.pop();
             }
             *torcs_speed = speed * 1000 / 3600;
