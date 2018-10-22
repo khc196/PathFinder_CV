@@ -46,16 +46,6 @@ int main(int argc, char* argv)
             Mat flipped_img;
             flip(origin_img, flipped_img, 0);
             pf->operate(flipped_img);
-            int size = pf->direction_vec.size();
-            *torcs_steer = 0;
-            //int speed = (int) pf->speed;
-            int speed = 83;
-            speed = pf->speed;
-            for(int i = 0; i < size; i++){
-                *torcs_steer = -pf->direction_vec.front();
-                pf->direction_vec.pop();
-            }
-            *torcs_speed = speed * 1000 / 3600;
             *torcs_lock = 0;
         }
     }
