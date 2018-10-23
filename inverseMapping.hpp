@@ -13,7 +13,7 @@ using namespace cv;
 const int CAMERA_POS_Y = 0;  // d (cm)
 const int CAMERA_POS_X = 0;  // l (cm)
 // for torcs
-const int CAMERA_POS_Z = 40; // h (cm)
+const int CAMERA_POS_Z = 25; // h (cm)
 const float FOV_H = 80.0f;   // (degree)
 const float FOV_V = 50.0f;   // (degree)
 const int SRC_RESIZED_WIDTH = 640;
