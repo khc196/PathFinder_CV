@@ -29,8 +29,6 @@ string to_string(int n) {
 class Path_Finder {
 protected:
 	Mat cannyImg, grayImg, remappedImg, dilatedImg;
-	int visit_array[200][200];
-	int ds_array[200][200];
     int vanishing_point_x;
     int vanishing_point_y;
     int* ipm_table;
@@ -39,15 +37,15 @@ protected:
 	float steer;
 	int num_of_goals;
 
-	const int car_position_x = 100;
-	const int car_position_y = 145;
+	int car_position_x;
+	int car_position_y;
 public:
 	Path_Finder() {}
-	void init();
+	void init(int, int, int, int, int);
 	void operate(Mat originImg);
 };
 
-void Path_Finder::init() {
+void Path_Finder::init(int car_position_x = 100, int car_position_y = 145, int vanishing_point_x = 320, int vanishing_point_y = 235, int num_of_goals = 7) {
 	string path = "output.avi";
 	struct tm* datetime;
 	time_t t;
@@ -55,8 +53,10 @@ void Path_Finder::init() {
 	datetime = localtime(&t);
 	string s_t = path;
 	
-	vanishing_point_x = 320;
-	vanishing_point_y = 235;
+	this->vanishing_point_x = vanishing_point_x;
+	this->vanishing_point_y = vanishing_point_y;
+	this->car_position_x = car_position_x;
+	this->car_position_y = car_position_y;
 	steer = 0.f;
 	//outputVideo.open(s_t, VideoWriter::fourcc('X', 'V', 'I', 'D'), 10, Size(720, 120), true);
 	outputVideo.open(s_t, VideoWriter::fourcc('D', 'I', 'V', 'X'), 10, Size(920, 200), true);
@@ -64,7 +64,7 @@ void Path_Finder::init() {
     build_ipm_table(SRC_RESIZED_WIDTH, SRC_RESIZED_HEIGHT, 
                     DST_REMAPPED_WIDTH, DST_REMAPPED_HEIGHT, 
                     vanishing_point_x, vanishing_point_y, ipm_table);
-	num_of_goals = 19;
+	this->num_of_goals = num_of_goals;
 }
 void Path_Finder::operate(Mat originImg) {
 	Mat grayImg;
@@ -80,7 +80,8 @@ void Path_Finder::operate(Mat originImg) {
 	for(int i = 0; i < 20; i++){
 		dilate(dilatedImg, dilatedImg, Mat());
 	}
-
+	
+	resize(dilatedImg, dilatedImg, Size(20, 20));
 	/* set goals */
 	Point goals[100];
 	for(int i = 1; i <= num_of_goals; i++) {
@@ -88,7 +89,6 @@ void Path_Finder::operate(Mat originImg) {
 			goals[i-1] = Point(car_position_x + int(60*cos(180/(num_of_goals+1)*i*3.1416/180)), car_position_y - int(60*sin(180/(num_of_goals+1)*i*3.1416/180)));
 		else
 			goals[i-1] = Point(car_position_x, car_position_y - 60);
-		
 	}
 	
 	/* find path using Astar */
@@ -96,20 +96,23 @@ void Path_Finder::operate(Mat originImg) {
 	int min_cost = 1000000;
 	int min_cost_index = -1;
 	
-	Astar* astar = new Astar(200, 200);
+	Astar* astar = new Astar(20, 20);
 	astar->load_map(dilatedImg);
+	Point start_point(car_position_x/10, car_position_y/10);
 	for(int i = 0; i < num_of_goals; i++) {
-		Point start_point(car_position_x, car_position_y);
-		costs[i] = astar->find_path(start_point, goals[i]);
-		if(costs[i] > min_cost) {
+		costs[i] = astar->find_path(start_point, Point(goals[i].x / 10, goals[i].y / 10));
+		if(costs[i] < min_cost) {
 			min_cost = costs[i];
 			min_cost_index = i;
 		}
 	}
-	printf("min_cost : %d\n", costs[min_cost_index]);
+	
+	//printf("min_cost : %d\n", costs[min_cost_index]);
+	resize(dilatedImg, dilatedImg, Size(200, 200));
 	/* just for imshow */
 	cvtColor(remappedImg, remappedImg, CV_GRAY2BGR);
 	cvtColor(cannyImg, cannyImg, CV_GRAY2BGR);
+
 	cvtColor(dilatedImg, dilatedImg, CV_GRAY2BGR);
 	for(int i = 0; i < num_of_goals; i++) {
 		if(i == min_cost_index)

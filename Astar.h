@@ -3,6 +3,12 @@
 
 #include <malloc.h>
 #include <cv.h>
+#include <unistd.h>
+#include <highgui.h>
+#include "opencv2/opencv.hpp"
+#include "opencv2/objdetect.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
 
 using namespace std;
 using namespace cv;
@@ -12,7 +18,7 @@ using namespace cv;
 #define CLOSED  -3
 #define UNDEF  -1
 #define INF   0
-#define MAX 200
+#define MAXS 200
 
 typedef struct vertex{
  int c;
@@ -32,14 +38,15 @@ private:
     void enqueue(VERTEX);
     VERTEX dequeue(void);
     int empty_queue(void);
-    int g[MAX][MAX];
-    int map[MAX][MAX];
-    int visit[MAX][MAX];
-    int pre[MAX][MAX];
+    int g[MAXS][MAXS];
+    int map[MAXS][MAXS];
+    int visit[MAXS][MAXS];
+    int pre[MAXS][MAXS];
     int width;
     int height;
     QUEUE* q;
     VERTEX s, e;
+    Mat img, img2;
 public:
     Astar(int, int);
     void load_map(Mat);

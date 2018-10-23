@@ -1,7 +1,7 @@
 #include "Astar.h"
 
 Astar::Astar(int width, int height) {
-    if(width > MAX || height > MAX){
+    if(width > MAXS || height > MAXS){
         printf("Size must be smaller than (200,200)\n");
         exit(1);
     }
@@ -13,6 +13,7 @@ void Astar::add_openlist(VERTEX v) {
     VERTEX temp;
     int cnt  = 0;
     int i, j, w, gx;
+
     // check the vertexs that are located on the nearest points.
     for( i = v.c-1 ;i <= v.c+1 ; i ++)
     {
@@ -23,9 +24,13 @@ void Astar::add_openlist(VERTEX v) {
         {
             // if the point is off the map or same with current point,
             // the points that can't move.
-            if( j < 0 || (i == v.c && j == v.r) || visit[i][j] <= DONTMOVE) continue;
+            if( j < 0 || (i == v.c && j == v.r) || visit[i][j] <= DONTMOVE) {
+                continue;
+            }
             // calculate the weight about the point
             w = calc_heuristic( v, i, j, &gx);
+            //printf("(%d, %d) : %d\n", v.c, v.r, w);
+
             // if the weight that have calculated now is lower than
             // original weight.
             if( w < g[i][j] || g[i][j] == INF)
@@ -44,7 +49,11 @@ void Astar::add_openlist(VERTEX v) {
             temp.r = j;
             temp.g = gx;
             // enqueue this point.
+            //printf("enque : (%d, %d)\n", temp.c, temp.r);
             enqueue( temp);
+            img2.data[j * img2.step + i*3 + 0] = 125;
+            img2.data[j * img2.step + i*3 + 1] = 125;
+            img2.data[j * img2.step + i*3 + 2] = 0;
         }
     }
 }
@@ -89,14 +98,13 @@ void Astar::enqueue(VERTEX v) {
 
         if( key < g[f->v.c][f->v.r])
         {
-        temp = f->v;
-        f->v = v;
-        v  = temp;
+            temp = f->v;
+            f->v = v;
+            v  = temp;
         }
 
         f = f->next;
     }
-
     newq->v = v;
     f->next = newq;
 }
@@ -122,46 +130,78 @@ int Astar::empty_queue(void) {
     return q == NULL;
 }
 void Astar::load_map(Mat src) {
+    img = Mat(height, width, CV_8UC1);
+    img2 = Mat(height, width, CV_8UC3);
     for(int i = 0; i < height; i++) {
         for(int j = 0; j < width; j++){
             if(src.data[i * src.step + j] > 0){
-                map[i][j] = WALL;
+                map[j][i] = WALL;
+                img.data[i * img.step + j] = 255;
             }
             else{
-                map[i][j] = 0;
+                map[j][i] = 0;
+                img.data[i * img.step + j] = 0;
             }
         }
     }
+    cvtColor(img, img, CV_GRAY2BGR);
 }
 int Astar::find_path(Point sp, Point ep) {
-    printf("find path\n");
+    printf("find path from (%d, %d) to (%d, %d)\n", sp.x, sp.y, ep.x, ep.y);
     VERTEX v;
     s.c = sp.x;
     s.r = sp.y;
     e.c = ep.x;
     e.r = ep.y;
-    memcpy(visit, map, sizeof(int)*width*height);
+    if(map[ep.x][ep.y] < 0) {
+        return 100000;
+    }
+    
+    memset(visit, 0, sizeof(int)*width*height);
+    memcpy(visit, map, sizeof(map));
     memset(g, 0, sizeof(int)*width*height);
     memset(pre, 0, sizeof(int)*width*height);
+    q = NULL;
     g[s.c][s.r]  = 0; // init weight on the starting point.
     pre[s.c][s.r] = UNDEF; // the starting point don't have previous root.
     s.g    = 0; // it means that the number of moving.
     v = s; // make the starting point as current point.
     // add adjacency vertexs to the open list.
     add_openlist(v);
+    img.copyTo(img2(Rect(0, 0, width, height)));
+    img2.data[e.r * img.step + e.c*3 + 0] = 0;
+    img2.data[e.r * img.step + e.c*3 + 1] = 0;
+    img2.data[e.r * img.step + e.c*3 + 2] = 255;
+    
     while(!empty_queue())
     {
-        //printf("(%d, %d)\n", v.c, v.r);
+        
         // add current vertex to the closed list.
         visit[v.c][v.r] = CLOSED;
+        img2.data[v.r * img2.step + v.c*3 + 0] = 255;
+        img2.data[v.r * img2.step + v.c*3 + 1] = 0;
+        img2.data[v.r * img2.step + v.c*3 + 2] = 0;
+        //imshow("img", img2);
+        //waitKey(0);
+        //printf("%d %d, %d\n", v.c, v.r, visit[v.c][v.r]);
         // update current vertex
         v = dequeue();
+        if(visit[v.c][v.r] == WALL) {
+            continue;
+        }
+        if(e.c == v.c && e.r == v.r) {
+            break;
+        }
         // add adjacency vertexs to the open list.
-        if(visit[v.c][v.r] != CLOSED)
-            add_openlist(v);
+        add_openlist(v);
+        // resize(img2, img2, Size(200, 200));
+        // imshow("img", img2);
+        // waitKey(0);
+        // resize(img2, img2, Size(20, 20));
     }
+
     if (v.c == e.c && v.r == e.r) {
-        printf("Done!\n");
+        printf("Done! - cost = %d\n", g[v.c][v.r]);
         return g[v.c][v.r];
     }
     else {
