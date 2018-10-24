@@ -94,20 +94,27 @@ void Path_Finder::operate(Mat originImg) {
 	/* find path using Astar */
 	int costs[100];
 	int min_cost = 1000000;
-	int min_cost_index = -1;
+	int min_cost_index = 0;
 	
 	Astar* astar = new Astar(20, 20);
 	astar->load_map(dilatedImg);
 	Point start_point(car_position_x/10, car_position_y/10);
-	for(int i = 0; i < num_of_goals; i++) {
-		costs[i] = astar->find_path(start_point, Point(goals[i].x / 10, goals[i].y / 10));
-		if(costs[i] < min_cost) {
+	costs[0] = astar->find_path(start_point, Point(goals[num_of_goals/2].x / 10, goals[num_of_goals/2].y / 10));
+	min_cost = costs[0];
+	for(int i = 1; i <= (int)num_of_goals/2; i++) {
+		costs[2*(i-1) + 1] = astar->find_path(start_point, Point(goals[num_of_goals/2 - i].x / 10, goals[num_of_goals/2 - i].y / 10));
+	}
+	for(int i = 1; i <= (int)num_of_goals/2; i++) {
+		costs[2*i] = astar->find_path(start_point, Point(goals[num_of_goals/2 + i].x / 10, goals[num_of_goals/2 + i].y / 10));
+	}	
+	for(int i = 1; i < num_of_goals; i++) {
+		if(min_cost > costs[i]) {
 			min_cost = costs[i];
 			min_cost_index = i;
 		}
 	}
 	
-	//printf("min_cost : %d\n", costs[min_cost_index]);
+	printf("min_cost : %d - %d\n", costs[min_cost_index], min_cost_index);
 	resize(dilatedImg, dilatedImg, Size(200, 200));
 	/* just for imshow */
 	cvtColor(remappedImg, remappedImg, CV_GRAY2BGR);
@@ -115,12 +122,25 @@ void Path_Finder::operate(Mat originImg) {
 
 	cvtColor(dilatedImg, dilatedImg, CV_GRAY2BGR);
 	for(int i = 0; i < num_of_goals; i++) {
-		if(i == min_cost_index)
-			circle(dilatedImg, goals[i], 3, Scalar(0, 255, 0), -1);
-		else
-			circle(dilatedImg, goals[i], 3, Scalar(35, 150, 255), -1);
+		if(i % 2 == 0){
+			if(i == min_cost_index){
+				circle(dilatedImg, goals[(int)num_of_goals/2 + i/2], 3, Scalar(0, 255, 0), -1);
+			}
+			else{
+				circle(dilatedImg, goals[(int)num_of_goals/2 + i/2], 3, Scalar(35, 125, 255), -1);
+			}
+		}
+		else {
+			if(i == min_cost_index){
+				circle(dilatedImg, goals[(int)num_of_goals/2 - (i+1)/2], 3, Scalar(0, 255, 0), -1);
+			}
+			else{
+				circle(dilatedImg, goals[(int)num_of_goals/2 - (i+1)/2], 3, Scalar(25, 125, 255), -1);
+			}
+		}
 	}
 	circle(dilatedImg, Point(car_position_x, car_position_y), 3, Scalar(35, 250, 255), -1);
+	
 	
 	Mat result;
 	resize(originImg, originImg, Size(320, 200));

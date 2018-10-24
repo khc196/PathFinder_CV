@@ -38,12 +38,12 @@ void Astar::add_openlist(VERTEX v) {
                 g[i][j]  = w;
                 pre[i][j] = (v.c * width) + v.r;
 
-                // if this point is the same with ending point.
-                if( e.c == i && e.c == j)
-                {
-                    q = NULL;
-                    return;
-                }
+                // // if this point is the same with ending point.
+                // if( e.c == i && e.c == j)
+                // {
+                //     q = NULL;
+                //     return;
+                // }
             }
             temp.c = i;
             temp.r = j;
@@ -63,15 +63,20 @@ int Astar::calc_heuristic(VERTEX v, int c, int r, int *gx) {
     result = ((abs(e.c - c) + abs(e.r - r)) * 10);
     // get g(x) value of previous vertex.
     *gx = v.g;
+
     // examine whether this point is located on the diagonal.
     // increase the count of moving
-    if( abs(v.c - c) == abs(v.r - r))
+    if( abs(c) == abs(r))
     {
         *gx = *gx + 14;  
     }
     else
     {
         *gx = *gx + 10;
+    }
+
+    if( abs(c) > 0) {
+        *gx = *gx * 1.2;
     }
     return result + *gx;
 }
@@ -147,20 +152,21 @@ void Astar::load_map(Mat src) {
     cvtColor(img, img, CV_GRAY2BGR);
 }
 int Astar::find_path(Point sp, Point ep) {
-    printf("find path from (%d, %d) to (%d, %d)\n", sp.x, sp.y, ep.x, ep.y);
+    printf("find path from (%d, %d) to (%d, %d) ...", sp.x, sp.y, ep.x, ep.y);
     VERTEX v;
     s.c = sp.x;
     s.r = sp.y;
     e.c = ep.x;
     e.r = ep.y;
-    if(map[ep.x][ep.y] < 0) {
+    if(map[sp.x][sp.y] < 0 || map[ep.x][ep.y] < 0) {
+        printf("start point or end point is on wall\n");
         return 100000;
     }
     
-    memset(visit, 0, sizeof(int)*width*height);
+    memset(visit, 0, sizeof(visit));
     memcpy(visit, map, sizeof(map));
-    memset(g, 0, sizeof(int)*width*height);
-    memset(pre, 0, sizeof(int)*width*height);
+    memset(g, 0, sizeof(g));
+    memset(pre, 0, sizeof(pre));
     q = NULL;
     g[s.c][s.r]  = 0; // init weight on the starting point.
     pre[s.c][s.r] = UNDEF; // the starting point don't have previous root.
@@ -172,40 +178,94 @@ int Astar::find_path(Point sp, Point ep) {
     img2.data[e.r * img.step + e.c*3 + 0] = 0;
     img2.data[e.r * img.step + e.c*3 + 1] = 0;
     img2.data[e.r * img.step + e.c*3 + 2] = 255;
-    
+    int count = 0;
     while(!empty_queue())
     {
-        
+        count++;
+        if(count > 50) {
+            break;
+        }
         // add current vertex to the closed list.
         visit[v.c][v.r] = CLOSED;
         img2.data[v.r * img2.step + v.c*3 + 0] = 255;
         img2.data[v.r * img2.step + v.c*3 + 1] = 0;
         img2.data[v.r * img2.step + v.c*3 + 2] = 0;
-        //imshow("img", img2);
-        //waitKey(0);
+        Mat img3;
+        resize(img2, img3, Size(200, 200));
+        //imshow("img", img3);
+        if(waitKey(10) == 0){
+            return 0;
+        }
         //printf("%d %d, %d\n", v.c, v.r, visit[v.c][v.r]);
         // update current vertex
         v = dequeue();
         if(visit[v.c][v.r] == WALL) {
             continue;
         }
-        if(e.c == v.c && e.r == v.r) {
-            break;
-        }
+        
         // add adjacency vertexs to the open list.
         add_openlist(v);
-        // resize(img2, img2, Size(200, 200));
-        // imshow("img", img2);
-        // waitKey(0);
-        // resize(img2, img2, Size(20, 20));
+        if(e.c == v.c && e.r == v.r && g[v.c][v.r] > 0) {
+            break;
+        }
     }
 
     if (v.c == e.c && v.r == e.r) {
         printf("Done! - cost = %d\n", g[v.c][v.r]);
+        //print_character();
         return g[v.c][v.r];
     }
     else {
-        printf("Failed!\n");
+        printf("It's (%d, %d)!! - Failed!\n", v.c, v.r);
         return 100000;
+    }
+}
+
+void Astar::print_character(void)
+{
+    int i, j, backtrack;
+
+    // to back track, calculate the coordinate.
+    i  = pre[e.c][e.r] / width;
+    j  = pre[e.c][e.r] % height;
+
+    // continuously calculate the previous coordinates.
+    while( pre[i][j] != UNDEF)
+    {
+        backtrack = pre[i][j];
+
+        g[i][j] = 7;
+
+        i  = backtrack / width;
+        j  = backtrack % height;
+    }
+
+    // display the root as characters.
+    for( i = 0 ; i < height ; i ++)
+    {
+        for( j = 0 ; j < width ; j++)
+        {
+            if( j == e.c && i == e.r)
+            {
+                printf("%5s", "★");
+            }
+            else if( j == s.c && i == s.r)
+            {
+                printf("%5s", "☆");
+            }
+                else if( g[j][i] == 7)
+            {
+            printf("%5s", "●");
+            }
+                else if( visit[j][i] == -2)
+            {
+                printf("%5s", "▤");
+            }
+            else
+            {
+                printf("%5s", "○");
+            }
+        }
+        printf("\n");
     }
 }

@@ -52,6 +52,7 @@ public:
     void load_map(Mat);
     int find_path(Point, Point);
     int* get_visit();
+    void print_character(void);
 };
 
 #endif
