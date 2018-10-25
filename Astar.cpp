@@ -224,6 +224,7 @@ int Astar::find_path(Point sp, Point ep) {
 
 vector<Point> Astar::get_path(void)
 {
+    printf("get path...");
     int i, j, backtrack;
     path.clear();
     // to back track, calculate the coordinate.
@@ -241,6 +242,7 @@ vector<Point> Astar::get_path(void)
             break;
         }
     }
+    printf(" Done\n");
     return path;
 }
 

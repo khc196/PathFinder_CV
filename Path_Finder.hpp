@@ -86,9 +86,9 @@ void Path_Finder::operate(Mat originImg) {
 	Point goals[100];
 	for(int i = 1; i <= num_of_goals; i++) {
 		if(i != (num_of_goals+1)/2)
-			goals[i-1] = Point(car_position_x + int(60*cos(180/(num_of_goals+1)*i*3.1416/180)), car_position_y - int(60*sin(180/(num_of_goals+1)*i*3.1416/180)));
+			goals[i-1] = Point(car_position_x + int(100*cos(180/(num_of_goals+1)*i*3.1416/180)), car_position_y - int(100*sin(180/(num_of_goals+1)*i*3.1416/180)));
 		else
-			goals[i-1] = Point(car_position_x, car_position_y - 60);
+			goals[i-1] = Point(car_position_x, car_position_y - 100);
 	}
 	
 	/* find path using Astar */
@@ -101,15 +101,18 @@ void Path_Finder::operate(Mat originImg) {
 	vector<Point> shortest_path[100];
 	Point start_point(car_position_x/10, car_position_y/10);
 	costs[0] = astar->find_path(start_point, Point(goals[num_of_goals/2].x / 10, goals[num_of_goals/2].y / 10));
-	shortest_path[0] = astar->get_path();
+	if(costs[0] < 10000)
+		shortest_path[0] = astar->get_path();
 	min_cost = costs[0];
 	for(int i = 1; i <= (int)num_of_goals/2; i++) {
 		costs[2*(i-1) + 1] = astar->find_path(start_point, Point(goals[num_of_goals/2 - i].x / 10, goals[num_of_goals/2 - i].y / 10));
-		shortest_path[i] = astar->get_path();
+		if(costs[2*(i-1) + 1] < 10000)
+			shortest_path[2*(i-1) + 1] = astar->get_path();
 	}
 	for(int i = 1; i <= (int)num_of_goals/2; i++) {
 		costs[2*i] = astar->find_path(start_point, Point(goals[num_of_goals/2 + i].x / 10, goals[num_of_goals/2 + i].y / 10));
-		shortest_path[i] = astar->get_path();
+		if(costs[2*i] < 10000)
+			shortest_path[2*i] = astar->get_path();
 	}	
 	for(int i = 1; i < num_of_goals; i++) {
 		if(min_cost > costs[i]) {
@@ -146,7 +149,6 @@ void Path_Finder::operate(Mat originImg) {
 	}
 	circle(dilatedImg, Point(car_position_x, car_position_y), 3, Scalar(35, 250, 255), -1);
 	for(int i = 0; i < shortest_path[min_cost_index].size(); i++){
-		printf("%d %d\n", shortest_path[min_cost_index][i].x, shortest_path[min_cost_index][i].y);
 		circle(dilatedImg, Point(shortest_path[min_cost_index][i].x * 10, shortest_path[min_cost_index][i].y * 10), 3, Scalar(0, 255, 0), -1);
 	}
 	
