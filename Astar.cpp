@@ -60,24 +60,25 @@ void Astar::add_openlist(VERTEX v) {
 int Astar::calc_heuristic(VERTEX v, int c, int r, int *gx) {
     int result;
     // calculate h(x) value.
-    result = ((abs(e.c - c) + abs(e.r - r)) * 10);
+    result = ((abs(e.c - c) * 10 + abs(e.r - r)) * 10);
     // get g(x) value of previous vertex.
     *gx = v.g;
 
     // examine whether this point is located on the diagonal.
     // increase the count of moving
-    if( abs(c) == abs(r))
+    if( abs(v.c - c) == abs(v.r - r))
     {
-        *gx = *gx + 14;  
+        *gx = *gx + 20;  
     }
-    else
+    else if(abs(v.c - c) == 0) 
     {
         *gx = *gx + 10;
+    } 
+    else
+    {
+        *gx = *gx + 17;
     }
 
-    if( abs(c) > 0) {
-        *gx = *gx * 1.2;
-    }
     return result + *gx;
 }
 void Astar::enqueue(VERTEX v) {
@@ -192,10 +193,10 @@ int Astar::find_path(Point sp, Point ep) {
         img2.data[v.r * img2.step + v.c*3 + 2] = 0;
         Mat img3;
         resize(img2, img3, Size(200, 200));
-        //imshow("img", img3);
-        if(waitKey(10) == 0){
-            return 0;
-        }
+        // imshow("img", img3);
+        // if(waitKey(10) == 0){
+        //     return 0;
+        // }
         //printf("%d %d, %d\n", v.c, v.r, visit[v.c][v.r]);
         // update current vertex
         v = dequeue();
@@ -220,6 +221,29 @@ int Astar::find_path(Point sp, Point ep) {
         return 100000;
     }
 }
+
+vector<Point> Astar::get_path(void)
+{
+    int i, j, backtrack;
+    path.clear();
+    // to back track, calculate the coordinate.
+    i  = pre[e.c][e.r] / width;
+    j  = pre[e.c][e.r] % height;
+    // continuously calculate the previous coordinates.
+    while( pre[i][j] != UNDEF)
+    {
+        backtrack = pre[i][j];
+        g[i][j] = 7;
+        path.push_back(Point(i, j));
+        i  = backtrack / width;
+        j  = backtrack % height;
+        if((i == 0 && j ==0) || ((i == height -1) && (j == width - 1))){
+            break;
+        }
+    }
+    return path;
+}
+
 
 void Astar::print_character(void)
 {
@@ -253,11 +277,11 @@ void Astar::print_character(void)
             {
                 printf("%5s", "☆");
             }
-                else if( g[j][i] == 7)
+            else if( g[j][i] == 7)
             {
-            printf("%5s", "●");
+                printf("%5s", "●");
             }
-                else if( visit[j][i] == -2)
+            else if( visit[j][i] == -2)
             {
                 printf("%5s", "▤");
             }

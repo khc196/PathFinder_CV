@@ -98,14 +98,18 @@ void Path_Finder::operate(Mat originImg) {
 	
 	Astar* astar = new Astar(20, 20);
 	astar->load_map(dilatedImg);
+	vector<Point> shortest_path[100];
 	Point start_point(car_position_x/10, car_position_y/10);
 	costs[0] = astar->find_path(start_point, Point(goals[num_of_goals/2].x / 10, goals[num_of_goals/2].y / 10));
+	shortest_path[0] = astar->get_path();
 	min_cost = costs[0];
 	for(int i = 1; i <= (int)num_of_goals/2; i++) {
 		costs[2*(i-1) + 1] = astar->find_path(start_point, Point(goals[num_of_goals/2 - i].x / 10, goals[num_of_goals/2 - i].y / 10));
+		shortest_path[i] = astar->get_path();
 	}
 	for(int i = 1; i <= (int)num_of_goals/2; i++) {
 		costs[2*i] = astar->find_path(start_point, Point(goals[num_of_goals/2 + i].x / 10, goals[num_of_goals/2 + i].y / 10));
+		shortest_path[i] = astar->get_path();
 	}	
 	for(int i = 1; i < num_of_goals; i++) {
 		if(min_cost > costs[i]) {
@@ -115,6 +119,7 @@ void Path_Finder::operate(Mat originImg) {
 	}
 	
 	printf("min_cost : %d - %d\n", costs[min_cost_index], min_cost_index);
+	
 	resize(dilatedImg, dilatedImg, Size(200, 200));
 	/* just for imshow */
 	cvtColor(remappedImg, remappedImg, CV_GRAY2BGR);
@@ -140,7 +145,10 @@ void Path_Finder::operate(Mat originImg) {
 		}
 	}
 	circle(dilatedImg, Point(car_position_x, car_position_y), 3, Scalar(35, 250, 255), -1);
-	
+	for(int i = 0; i < shortest_path[min_cost_index].size(); i++){
+		printf("%d %d\n", shortest_path[min_cost_index][i].x, shortest_path[min_cost_index][i].y);
+		circle(dilatedImg, Point(shortest_path[min_cost_index][i].x * 10, shortest_path[min_cost_index][i].y * 10), 3, Scalar(0, 255, 0), -1);
+	}
 	
 	Mat result;
 	resize(originImg, originImg, Size(320, 200));
@@ -154,6 +162,7 @@ void Path_Finder::operate(Mat originImg) {
 	
 	imshow("result", result);
 	//outputVideo << result;
+	delete astar;
 	if(waitKey(10) == 0) {
 		return;
 	}

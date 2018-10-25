@@ -9,6 +9,7 @@
 #include "opencv2/objdetect.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
+#include <vector>
 
 using namespace std;
 using namespace cv;
@@ -47,11 +48,13 @@ private:
     QUEUE* q;
     VERTEX s, e;
     Mat img, img2;
+    vector<Point> path;
 public:
     Astar(int, int);
     void load_map(Mat);
     int find_path(Point, Point);
     int* get_visit();
+    vector<Point> get_path();
     void print_character(void);
 };
 
