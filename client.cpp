@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>  
+#include <time.h>
 
 #include <sys/shm.h>
 #include <sys/sem.h>
@@ -35,9 +36,16 @@ int main(int argc, char* argv)
     Path_Finder* pf = new Path_Finder();
     pf->init();
     int* torcs_lock = (int*)(shared_memory + size_of_shared_memory + sizeof(int));
+    struct timeval start_point, end_point;
+    double operating_time;
+    gettimeofday(&start_point, NULL);
     *torcs_lock = 1;
     while(true){
         if(*torcs_lock == 1) {
+            gettimeofday(&end_point, NULL);
+            operating_time = (double)(end_point.tv_sec)+(double)(end_point.tv_usec)/1000000.0-(double)(start_point.tv_sec)-(double)(start_point.tv_usec)/1000000.0;
+            printf("operating time : %f\n\n", operating_time);
+            gettimeofday(&start_point, NULL);
             unsigned char* img = (unsigned char*)shared_memory;
             float* torcs_steer = (float*)(shared_memory + size_of_shared_memory);
             int* torcs_speed = (int*)(shared_memory + size_of_shared_memory + sizeof(int)*2);
