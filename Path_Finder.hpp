@@ -45,7 +45,7 @@ public:
 	void operate(Mat originImg);
 };
 
-void Path_Finder::init(int car_position_x = 100, int car_position_y = 145, int vanishing_point_x = 320, int vanishing_point_y = 235, int num_of_goals = 7) {
+void Path_Finder::init(int car_position_x = 100, int car_position_y = 145, int vanishing_point_x = 320, int vanishing_point_y = 235, int num_of_goals = 5) {
 	string path = "output.avi";
 	struct tm* datetime;
 	time_t t;
@@ -76,81 +76,40 @@ void Path_Finder::operate(Mat originImg) {
 	morphologyEx(cannyImg, dilatedImg, MORPH_CLOSE, Mat(12,12, CV_8U, Scalar(1)));
 	Mat black(Size(200, 70), CV_8U, Scalar(0));
 	black.copyTo(dilatedImg(Rect(0, 130, 200, 70)));
+	
+	const float PI = 3.1416f;
+	vector<cv::Vec2f> lines;
+	HoughLines(dilatedImg, lines, 1, PI/180, 100);
 
-	for(int i = 0; i < 20; i++){
+	vector<Vec2f>::const_iterator it= lines.begin();
+	
+	while (it!=lines.end()) {
+		float rho = (*it)[0];   
+		float theta = (*it)[1]; 
+		if (theta < PI/4. || theta > 3.*PI/4.) { 
+			Point pt1(rho/cos(theta), 0); 
+			Point pt2((rho-dilatedImg.rows*sin(theta))/cos(theta), dilatedImg.rows);
+			line(dilatedImg, pt1, pt2, Scalar(0), 10); 
+
+		} else {
+			Point pt1(0,rho/sin(theta)); 
+			Point pt2(dilatedImg.cols,(rho-dilatedImg.cols*cos(theta))/sin(theta));
+			line(dilatedImg, pt1, pt2, Scalar(0), 10);
+		}
+		++it;
+	}
+	Mat roiCircle(Size(200, 200), CV_8U, Scalar(0));
+	circle(roiCircle, Point(car_position_x, car_position_y), 50, Scalar(255), -1);
+	dilatedImg = dilatedImg&roiCircle;
+	for(int i = 0; i < 50; i++){
 		dilate(dilatedImg, dilatedImg, Mat());
 	}
 	
-	resize(dilatedImg, dilatedImg, Size(20, 20));
-	/* set goals */
-	Point goals[100];
-	for(int i = 1; i <= num_of_goals; i++) {
-		if(i != (num_of_goals+1)/2)
-			goals[i-1] = Point(car_position_x + int(100*cos(180/(num_of_goals+1)*i*3.1416/180)), car_position_y - int(100*sin(180/(num_of_goals+1)*i*3.1416/180)));
-		else
-			goals[i-1] = Point(car_position_x, car_position_y - 100);
-	}
-	
-	/* find path using Astar */
-	int costs[100];
-	int min_cost = 1000000;
-	int min_cost_index = 0;
-	
-	Astar* astar = new Astar(20, 20);
-	astar->load_map(dilatedImg);
-	vector<Point> shortest_path[100];
-	Point start_point(car_position_x/10, car_position_y/10);
-	costs[0] = astar->find_path(start_point, Point(goals[num_of_goals/2].x / 10, goals[num_of_goals/2].y / 10));
-	if(costs[0] < 10000)
-		shortest_path[0] = astar->get_path();
-	min_cost = costs[0];
-	for(int i = 1; i <= (int)num_of_goals/2; i++) {
-		costs[2*(i-1) + 1] = astar->find_path(start_point, Point(goals[num_of_goals/2 - i].x / 10, goals[num_of_goals/2 - i].y / 10));
-		if(costs[2*(i-1) + 1] < 10000)
-			shortest_path[2*(i-1) + 1] = astar->get_path();
-	}
-	for(int i = 1; i <= (int)num_of_goals/2; i++) {
-		costs[2*i] = astar->find_path(start_point, Point(goals[num_of_goals/2 + i].x / 10, goals[num_of_goals/2 + i].y / 10));
-		if(costs[2*i] < 10000)
-			shortest_path[2*i] = astar->get_path();
-	}	
-	for(int i = 1; i < num_of_goals; i++) {
-		if(min_cost > costs[i]) {
-			min_cost = costs[i];
-			min_cost_index = i;
-		}
-	}
-	
-	printf("min_cost : %d - %d\n", costs[min_cost_index], min_cost_index);
-	
-	resize(dilatedImg, dilatedImg, Size(200, 200));
 	/* just for imshow */
 	cvtColor(remappedImg, remappedImg, CV_GRAY2BGR);
 	cvtColor(cannyImg, cannyImg, CV_GRAY2BGR);
 
 	cvtColor(dilatedImg, dilatedImg, CV_GRAY2BGR);
-	for(int i = 0; i < num_of_goals; i++) {
-		if(i % 2 == 0){
-			if(i == min_cost_index){
-				circle(dilatedImg, goals[(int)num_of_goals/2 + i/2], 3, Scalar(0, 255, 0), -1);
-			}
-			else{
-				circle(dilatedImg, goals[(int)num_of_goals/2 + i/2], 3, Scalar(35, 125, 255), -1);
-			}
-		}
-		else {
-			if(i == min_cost_index){
-				circle(dilatedImg, goals[(int)num_of_goals/2 - (i+1)/2], 3, Scalar(0, 255, 0), -1);
-			}
-			else{
-				circle(dilatedImg, goals[(int)num_of_goals/2 - (i+1)/2], 3, Scalar(25, 125, 255), -1);
-			}
-		}
-	}
-	circle(dilatedImg, Point(car_position_x, car_position_y), 3, Scalar(35, 250, 255), -1);
-	for(int i = 0; i < shortest_path[min_cost_index].size(); i++){
-		circle(dilatedImg, Point(shortest_path[min_cost_index][i].x * 10, shortest_path[min_cost_index][i].y * 10), 3, Scalar(0, 255, 0), -1);
-	}
 	
 	Mat result;
 	resize(originImg, originImg, Size(320, 200));
@@ -164,7 +123,6 @@ void Path_Finder::operate(Mat originImg) {
 	
 	imshow("result", result);
 	//outputVideo << result;
-	delete astar;
 	if(waitKey(10) == 0) {
 		return;
 	}

@@ -183,7 +183,7 @@ int Astar::find_path(Point sp, Point ep) {
     while(!empty_queue())
     {
         count++;
-        if(count > 50) {
+        if(count > 5000) {
             break;
         }
         // add current vertex to the closed list.
