@@ -54,6 +54,8 @@ int main(int argc, char* argv)
             Mat flipped_img;
             flip(origin_img, flipped_img, 0);
             pf->operate(flipped_img);
+            *torcs_steer = pf->steer;
+            *torcs_speed = 30 / 3.6;
             *torcs_lock = 0;
         }
     }

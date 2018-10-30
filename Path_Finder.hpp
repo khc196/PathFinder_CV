@@ -14,8 +14,10 @@
 #include "opencv2/imgproc.hpp"
 #include <string.h>
 #include <sys/time.h>
+#include <cmath>
 #include "inverseMapping.hpp"
 #include "Astar.h"
+#include "polyfit.hpp"
 using namespace cv;
 using namespace std;
 
@@ -34,7 +36,6 @@ protected:
     int* ipm_table;
 	VideoWriter outputVideo;
 	bool isinit = true;
-	float steer;
 	int num_of_goals;
 
 	int car_position_x;
@@ -43,6 +44,7 @@ public:
 	Path_Finder() {}
 	void init(int, int, int, int, int);
 	void operate(Mat originImg);
+	float steer;
 };
 
 void Path_Finder::init(int car_position_x = 100, int car_position_y = 145, int vanishing_point_x = 320, int vanishing_point_y = 235, int num_of_goals = 5) {
@@ -66,23 +68,27 @@ void Path_Finder::init(int car_position_x = 100, int car_position_y = 145, int v
                     vanishing_point_x, vanishing_point_y, ipm_table);
 	this->num_of_goals = num_of_goals;
 }
+float euclideanDistance(Point center, Point point) {
+	return sqrt(pow((center.x - point.x),2) + pow((center.y - point.y), 2));
+}
 void Path_Finder::operate(Mat originImg) {
 	Mat grayImg;
     Mat remappedImg = Mat(DST_REMAPPED_HEIGHT, DST_REMAPPED_WIDTH, CV_8UC1);
 	//remappedImg = remappedImg(Rect(0, 0, 200, 200));
 	cvtColor(originImg, grayImg, CV_BGR2GRAY);
     inverse_perspective_mapping(DST_REMAPPED_WIDTH, DST_REMAPPED_HEIGHT, grayImg.data, ipm_table, remappedImg.data);
-	Canny(remappedImg, cannyImg, 70, 210);
+
+	Canny(remappedImg, cannyImg, 50, 150);
 	morphologyEx(cannyImg, dilatedImg, MORPH_CLOSE, Mat(12,12, CV_8U, Scalar(1)));
 	Mat black(Size(200, 70), CV_8U, Scalar(0));
 	black.copyTo(dilatedImg(Rect(0, 130, 200, 70)));
 	
 	const float PI = 3.1416f;
 	vector<cv::Vec2f> lines;
-	HoughLines(dilatedImg, lines, 1, PI/180, 100);
+	HoughLines(dilatedImg, lines, 1, PI/180, 80);
 
 	vector<Vec2f>::const_iterator it= lines.begin();
-	
+
 	while (it!=lines.end()) {
 		float rho = (*it)[0];   
 		float theta = (*it)[1]; 
@@ -98,13 +104,47 @@ void Path_Finder::operate(Mat originImg) {
 		}
 		++it;
 	}
-	Mat roiCircle(Size(200, 200), CV_8U, Scalar(0));
-	circle(roiCircle, Point(car_position_x, car_position_y), 50, Scalar(255), -1);
-	dilatedImg = dilatedImg&roiCircle;
-	for(int i = 0; i < 50; i++){
-		dilate(dilatedImg, dilatedImg, Mat());
-	}
+	// for(int i = 0; i < 200; i++){
+	// 	for(int j = 0; j < 200; j++){
+	// 		if(remappedImg.data[i * remappedImg.step + j] < 90){
+	// 			dilatedImg.data[i * dilatedImg.step + j] = 0;
+	// 		}
+	// 	}
+	// }
 	
+	Mat roiCircle(Size(200, 200), CV_8U, Scalar(0));
+	ellipse(roiCircle, Point(car_position_x, car_position_y), Size(70, 120), 0.0, 0.0, 360.0, Scalar(255), -1);
+	dilatedImg = dilatedImg&roiCircle;
+	erode(dilatedImg, dilatedImg, Mat());
+	GaussianBlur(dilatedImg, dilatedImg, Size(5, 5), 1.5);
+	vector<Point> nonZeros;
+	for(int i = 0; i < 200; i++){
+		for(int j = 0; j < 200; j++){
+			if(dilatedImg.data[i * dilatedImg.step + j] > 0){
+				nonZeros.push_back(Point(j, i));
+			}
+		}
+	}
+	int degree = 1;
+	vector<double> poly_line = polyfit(nonZeros, degree);
+	Mat detectImg(Size(200, 200), CV_8U, Scalar(0));
+	cvtColor(detectImg, detectImg, CV_GRAY2BGR);
+	for(int i = 0; i < 200; i++){
+		int y = 0;
+		for(int j = 0; j <= degree; j++)
+			y += poly_line[j] * pow(i, j);
+		if(y >= 0 && y <= 140){
+			circle(detectImg, Point(i, y), 5, Scalar(0, 255, 0), -1);
+		}
+	}
+
+	if(!isnan(poly_line[1])){
+		steer = 1/poly_line[1]/4;
+	}
+	else {
+		steer = 0;
+	}
+
 	/* just for imshow */
 	cvtColor(remappedImg, remappedImg, CV_GRAY2BGR);
 	cvtColor(cannyImg, cannyImg, CV_GRAY2BGR);
@@ -120,6 +160,7 @@ void Path_Finder::operate(Mat originImg) {
 	hconcat(result, cannyImg, result);
 	resize(dilatedImg, dilatedImg, Size(200, 200));
 	hconcat(result, dilatedImg, result);
+	hconcat(result, detectImg, result);
 	
 	imshow("result", result);
 	//outputVideo << result;
